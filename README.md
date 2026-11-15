@@ -1,35 +1,35 @@
-# Портфолио
+# MegaMicroParser — price scraper and catalog builder for MicroCatalog
 
-Мои проекты. Код основных проектов пока в приватных репозиториях, здесь — описание того, что сделано.
+A Python service that collects prices and stock of electronic components from Ukrainian online shops, matches shop
+listings to a catalog of parts, and grows that catalog from what the shops actually sell. It feeds
+[MicroCatalog](https://github.com/San4ost/microcatalog-showcase), a price-comparison website for the Ukrainian market
+(Ukrainian shops vs. AliExpress, landed price including delivery). The source code is in a private repository; this page
+describes the project.
 
-## MicroCatalog и MegaMicroParser — сравнение цен на электронные компоненты
+## What it does
 
-Сайт для Украины, который показывает, где дешевле купить электронный компонент (микросхему, транзистор, диод):
-украинские магазины против AliExpress, с ценой «под ключ» вместе с доставкой. Проект из двух частей, которые общаются
-только через общую базу Postgres (Supabase):
+- **13 shops**, including the Prom.ua marketplace, without per-site code. A shop is described by a data profile (CSS
+  selectors with a JSON-LD fallback). Onboarding a new shop is one command: an LLM proposes selectors and the scraper
+  validates them against canary products.
+- **Polite crawling**: honors robots.txt, rate limits with jitter, retries on 429/5xx, stops after repeated 403. It never
+  bypasses protection (no CAPTCHA solving, proxy rotation or disguise); a shop that objects is switched off.
+- **Product matching** ("seller title → catalog part"): layered rules (part numbers, packages, modules, kits, analogs,
+  lots) plus an LLM for ambiguous cases. A golden set of 349 labeled titles measures it; wrong matches to a different
+  part: 0.
+- **Self-checks**: profile health check on every run (canary product, share of parsed prices), automatic retraction of
+  matches that current rules no longer agree with, and a second opinion from a stronger model on the fast model's
+  decisions.
+- **Catalog growth**: unrecognized part numbers collect in a local market index, become candidates with LLM drafts
+  (title, package, category), then are approved by a human or auto-approved under strict conditions with rollback and an
+  automatic stop. The catalog grew from 141 to 484 parts.
+- **Enrichment**: part photos (WebP, uploaded to Supabase Storage over S3), specifications, kits as a separate feed, and
+  datasheet discovery from manufacturer sites (PDF text verification, link only, no copies published).
+- **New shop discovery** through the Tavily API with automatic domain checks.
+- **LLM fault tolerance**: fallback model, circuit breaker for the primary, response cache, client for any
+  OpenAI-compatible API.
+- **Result**: about 8,800 offers live on the site.
 
-- **MicroCatalog** — сайт (каталог деталей, страницы деталей с ценами и фото, поиск).
-- **MegaMicroParser** — парсер цен и наполнения каталога (Python).
-
-### Что умеет парсер
-
-- **13 магазинов**, включая маркетплейс Prom.ua, без отдельного кода под каждый сайт. Магазин описывается
-  профилем-данными (CSS-селекторы, запасной JSON-LD). Новый магазин подключается одной командой: ЛЛМ предлагает
-  селекторы, парсер проверяет их на контрольных товарах.
-- **Вежливый сбор**: robots.txt, паузы, повторы при 429/5xx, остановка после 403. Защиту сайтов не обходит.
-- **Сопоставление «заголовок продавца → деталь каталога»**: многоуровневые правила (артикулы, корпуса, модули, наборы,
-  аналоги, лоты) плюс ЛЛМ для спорного. Золотой набор из 349 размеченных заголовков, ошибочных привязок — 0.
-- **Самоконтроль**: проверка профиля в каждом прогоне, автоматическое снятие привязок, с которыми правила больше не
-  согласны, второе мнение более сильной модели по решениям быстрой.
-- **Рост каталога**: неопознанные артикулы собираются в индекс рынка, из них получаются кандидаты с черновиками ЛЛМ,
-  дальше одобрение человеком или автоодобрение с откатом и автостопом. Каталог вырос со 141 до 484 деталей.
-- **Обогащение данных**: фото деталей (WebP, выгрузка в Supabase Storage по S3), характеристики, наборы деталей
-  отдельной лентой, даташиты у производителей.
-- **Поиск новых магазинов** через Tavily API с автопроверкой доменов.
-- **Отказоустойчивость ЛЛМ**: запасная модель, «предохранитель» при сбоях основной, кэш ответов.
-- Результат: около 8 800 предложений на сайте.
-
-### Стек
+## Stack
 
 Python 3.13, httpx, selectolax, pydantic, psycopg 3, PostgreSQL (Supabase), SQLite, Gemini API (Gemma 4, Gemini),
-Tavily API, boto3 (S3), Pillow, pypdf, pytest (350+ тестов, интеграционные на одноразовой Postgres), uv.
+Tavily API, boto3 (S3), Pillow, pypdf, pytest (350+ tests, integration tests on a disposable Postgres), uv.
